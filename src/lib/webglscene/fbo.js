@@ -18,8 +18,8 @@ export default class FBO {
     };
 
     this.renderer = renderer;
-    this.width = 200;
-    this.height = 200;
+    this.width = 300;
+    this.height = 300;
     this.initAnimation = 0;
     this.amount = this.width * this.height;
     this.mainScene = mainScene;
@@ -80,7 +80,7 @@ export default class FBO {
     });
 
     this.textureMorphPositionA = this.createPositionTextureCube();
-    this.textureMorphPositionB = this.createPositionTextureSphere();
+    this.textureMorphPositionB = this.createPositionTextureDoubleSphere();
 
     this.positionRenderTarget2 = this.positionRenderTarget.clone();
     this.copyTexture(this.textureMorphPositionA, this.positionRenderTarget);
@@ -170,6 +170,49 @@ export default class FBO {
     texture.flipY = false;
     return texture;
   }
+
+  createPositionTextureDoubleSphere() {
+
+    const radius = 50;
+    const radius2 = 20;
+
+    function getPoint(v,size)
+    {
+        v.x = Math.random() * 2 - 1 ;
+        v.y = Math.random() * 2 - 1 ;
+        v.z = Math.random() * 2 - 1 ;
+        if(v.length()>1)return getPoint(v,size);
+        return v.normalize().multiplyScalar(size);
+    }
+    var len = this.amount * 4;
+    var positions = new Float32Array( len );
+    var p = new THREE.Vector3();
+    for( var i = 0; i < len/2; i+=4 )
+    {
+        getPoint( p, radius );
+        positions[ i     ] = p.x;
+        positions[ i + 1 ] = p.y;
+        positions[ i + 2 ] = p.z;
+        positions[ i + 3 ] = Math.random();
+    }
+
+    for( var i = len/2; i < len; i+=4 )
+    {
+        getPoint( p, radius2 );
+        positions[ i     ] = p.x;
+        positions[ i + 1 ] = p.y;
+        positions[ i + 2 ] = p.z;
+        positions[ i + 3 ] = Math.random();
+    }
+
+    var texture = new THREE.DataTexture( positions, this.width, this.height, THREE.RGBAFormat, THREE.FloatType );
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.needsUpdate = true;
+    texture.generateMipmaps = false;
+    texture.flipY = false;
+    return texture;
+  }
  
 
   createParticles() {
@@ -206,14 +249,17 @@ export default class FBO {
 
     this.particleMesh.customDistanceMaterial = new THREE.ShaderMaterial( {
       uniforms: {
-          texturePosition: { type: 't', value: this.positionRenderTarget.texture }
+          texturePosition: { type: 't', value: this.positionRenderTarget.texture },
+          referencePosition: {type: 'v3',  value: new THREE.Vector3(0,0,30) },
+          nearDistance: {type: 'f', value: 1 },
+          farDistance: {type: 'f', value: 1000 }
       },
       vertexShader: particlesDistanceVert,
       fragmentShader: particlesDistanceFrag,
-      depthTest: true,
-      depthWrite: true,
+      depthTest: false,
+      depthWrite: false,
       side: THREE.BackSide,
-      blending: THREE.NormalBlending
+      blending: THREE.NoBlending
     });
 
     this.particleMesh.castShadow = true;

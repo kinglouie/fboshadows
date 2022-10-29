@@ -1,20 +1,21 @@
-varying vec4 vWorldPosition;
+
+uniform vec3 referencePosition;
+uniform float nearDistance;
+uniform float farDistance;
+varying vec3 vWorldPosition;
 
 #include <common>
-
-vec4 pack1K ( float depth ) {
-
-   depth /= 1000.0;
-   const vec4 bitSh = vec4( 256.0 * 256.0 * 256.0, 256.0 * 256.0, 256.0, 1.0 );
-   const vec4 bitMsk = vec4( 0.0, 1.0 / 256.0, 1.0 / 256.0, 1.0 / 256.0 );
-   vec4 res = fract( depth * bitSh );
-   res -= res.xxyz * bitMsk;
-   return res;
-
-}
+#include <packing>
 
 void main () {
 
-   gl_FragColor = pack1K( length( vWorldPosition.xyz ) );
+	//make particles round
+	vec2 toCenter = ( gl_PointCoord.xy - 0.5 ) * 2.0;
+	float len = length( toCenter );
+	if ( len > 0.8 ) discard;
 
+   float dist = length( vWorldPosition - referencePosition );
+	dist = ( dist - nearDistance ) / ( farDistance - nearDistance );
+	dist = saturate( dist ); // clamp to [ 0, 1 ]
+	gl_FragColor = packDepthToRGBA( dist );
 }

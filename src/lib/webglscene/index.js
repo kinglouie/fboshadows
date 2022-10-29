@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ShadowMapViewer } from 'three/addons/utils/ShadowMapViewer.js';
 import { Pane } from 'tweakpane';
 import { gsap } from "gsap";
 import FBO from "./fbo";
@@ -12,7 +14,8 @@ export class ThreeScene {
   async init() {
 
     this.parameters = {
-      lightPosZ: 100,
+      animationProgress: 0,
+      lightPosZ: 30,
       lightPosX: 0,
       lightPosY: 0,
       speed: 0.1,
@@ -46,25 +49,45 @@ export class ThreeScene {
 
     this.addEvents();
 
+    await this.addLogo()
     this.addWall()
     this.addLights()
 
     this.fbo = new FBO();
     this.fbo.init(this.renderer, this.scene)
 
-    //this.setupTimeLine()
+    this.setupTimeLine()
 
     this.renderer.setAnimationLoop(() => {
       this.render()
     })
   }
 
+  async addLogo() {
+    const loader = new GLTFLoader();
+    const logoData = await loader.loadAsync('/logo.glb');
+    const model = logoData.scene;
+    model.rotation.x = Math.PI / 2;
+    model.position.z = 2;
+    model.scale.set(10, 10, 10);
 
+    var newMaterial = new THREE.MeshLambertMaterial({ color: 0xbf616a });
+    model.traverse((o) => {
+      if (o.isMesh) {
+        o.material = newMaterial;
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+    });
+    this.logo = model;
+    this.scene.add(model);
+  }
 
   addWall() {
     const mat = new THREE.MeshStandardMaterial();
     const geometry = new THREE.BoxGeometry(50, 50, 2);
     const wall = new THREE.Mesh(geometry, mat);
+    wall.position.z = -20;
     wall.castShadow = true;
     wall.receiveShadow = true;
     this.scene.add(wall);
@@ -72,11 +95,8 @@ export class ThreeScene {
 
   setupTimeLine() {
     this.tl = new gsap.timeline({
+      paused: true.valueOf,
       repeat: -1,
-    });
-    this.tl.to(this.light.position, {
-      z: 100,
-      duration: 4,
     });
     this.tl.to(this.light.position, {
       z: -100,
@@ -93,6 +113,16 @@ export class ThreeScene {
       title: 'Parameters',
       container: container,
     });
+
+    this.gui.addInput(this.parameters, 'animationProgress', {
+      label: 'animation',
+      min: 0,
+      max: 1,
+      step: 0.01,
+    })
+      .on('change', (ev) => {
+        this.tl.progress(this.parameters.animationProgress);
+      });
 
     this.gui.addInput(this.parameters, 'lightPosZ', {
       label: 'light Z',
@@ -158,15 +188,20 @@ export class ThreeScene {
 
 
   addLights() {
-    this.light = new THREE.PointLight(0xffff00, 5, 0);
+    this.light = new THREE.PointLight(0xffff00, 1, 0);
     this.light.castShadow = true;
     this.light.position.set(this.parameters.lightPosX, this.parameters.lightPosY, this.parameters.lightPosZ);
-    this.light.shadow.mapSize.width = 2048; // default is 512
-    this.light.shadow.mapSize.height = 2048; // default is 512
+    this.light.shadow.mapSize.width = 512; // default is 512
+    this.light.shadow.mapSize.height = 512; // default is 512
     this.scene.add(this.light);
 
     const pointLightHelper = new THREE.PointLightHelper(this.light, 2);
     this.scene.add(pointLightHelper);
+
+    this.pointLightShadowMapViewer = new ShadowMapViewer( this.light );
+    const size = window.innerWidth * 0.3;
+    this.pointLightShadowMapViewer.size.set( size, size );
+    this.pointLightShadowMapViewer.position.set( 0, 0 );
   }
 
   addEvents() {
@@ -184,5 +219,6 @@ export class ThreeScene {
     this.controls.update();
     this.fbo.update(dt);
     this.renderer.render(this.scene, this.camera);
+    this.pointLightShadowMapViewer.render(this.renderer);
   }
 }
